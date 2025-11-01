@@ -102,8 +102,9 @@ public class MainActivity extends AppCompatActivity {
 
             return bitmapList;
         }
+
         @Override
-        protected void onPostExcute(List<Bitmap> images) {
+        protected void onPostExecute(List<Bitmap> images) {
             if (images.isEmpty()) {
                 textView.setText("불러올 이미지가 없습니다.");
             } else {
@@ -114,6 +115,5 @@ public class MainActivity extends AppCompatActivity {
                 recyclerView.setAdapter(adapter);
             }
         }
-
     }
 }
