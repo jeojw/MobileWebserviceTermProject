@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Photo blog</title>
+    <style>
+        body {
+            font-family: "Noto Sans KR", sans-serif;
+            background-color: #fff;
+            margin: 0;
+        }
+        header {
+            background-color: #ff9800;
+            color: white;
+            padding: 15px;
+            font-size: 24px;
+            font-family: "Pacifico", cursive;
+        }
+        .container {
+            margin: 20px;
+        }
+        .post {
+            margin-bottom: 25px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .date {
+            color: gray;
+            font-size: 12px;
+        }
+        h1 {
+            font-size: 18px;
+            margin: 5px 0;
+        }
+        .plus {
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+<header>
+    Photo blog
+    <span class="plus">+</span>
+</header>
+<div class="container">
+    {% for post in posts %}
+        <div class="post">
+            <div class="date">{{ post.published_date|date:"Y년 n월 j일 g:i a" }}</div>
+            <h1>{{ post.title }}</h1>
+        </div>
+    {% empty %}
+        <p>게시글이 없습니다.</p>
+    {% endfor %}
+</div>
+</body>
+</html>

@@ -1,0 +1,17 @@
+GET /api_root/ HTTP/1.1
+Host: localhost:9000
+Connection: keep-alive
+sec-ch-ua: "Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"
+sec-ch-ua-mobile: ?0
+sec-ch-ua-platform: "Windows"
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Sec-Fetch-Site: none
+Sec-Fetch-Mode: navigate
+Sec-Fetch-User: ?1
+Sec-Fetch-Dest: document
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7
+Cookie: username-localhost-8888="2|1:0|10:1759764143|23:username-localhost-8888|196:eyJ1c2VybmFtZSI6ICJlYmE0NTk0MGI0NmQ0NjNmOGZkZmViZTZjYmQ1YjkwNCIsICJuYW1lIjogIkFub255bW91cyBFaXJlbmUiLCAiZGlzcGxheV9uYW1lIjogIkFub255bW91cyBFaXJlbmUiLCAiaW5pdGlhbHMiOiAiQUUiLCAiY29sb3IiOiBudWxsfQ==|fded686bc53599ba97dd41821998ec185d06e11a96bc0fb9f93c87b771fc376c"; _xsrf=2|878aa61b|5ed61a9fb7e255e2463cfbe21789c591|1759764143; csrftoken=EKhIZHqLPwSYogwIi16RYqcIVtQLEwRh
+

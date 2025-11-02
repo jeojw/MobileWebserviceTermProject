@@ -10,6 +10,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.loader.content.AsyncTaskLoader;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -18,6 +19,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -31,7 +34,7 @@ public class MainActivity extends AppCompatActivity {
 
     ImageView imgView;
     TextView textView;
-    String site_url = "http://localhost:8080";
+    String site_url = "http://10.0.2.2:9000/api_root/Post";
     JSONObject post_json;
     String imageUrl = null;
     Bitmap bmImg = null;
@@ -45,11 +48,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onClickDownload(View v) {
-
+        Toast.makeText(getApplicationContext(), "Downloading from socket server...", Toast.LENGTH_SHORT).show();
+        new CloudImage().execute(site_url);
     }
 
     public void onClickUpload(View v) {
-        Toast.makeText(getApplicationContext(), "Upload", Toast.LENGTH_LONG).show();
+        new PutPost().execute();
     }
 
     private class CloudImage extends AsyncTask<String, Integer, List<Bitmap>> {
@@ -113,6 +117,62 @@ public class MainActivity extends AppCompatActivity {
                 ImageAdapter adapter = new ImageAdapter(images);
                 recyclerView.setLayoutManager(new LinearLayoutManager(MainActivity.this));
                 recyclerView.setAdapter(adapter);
+            }
+        }
+    }
+
+    private class PutPost extends AsyncTask<Void, Void, Boolean> {
+
+        @Override
+        protected Boolean doInBackground(Void... voids) {
+            try {
+                Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.ic_launcher_background);
+
+                URL url = new URL(site_url);
+                String boundary = "*****" + Long.toString(System.currentTimeMillis()) + "*****";
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setDoOutput(true);
+                conn.setRequestProperty("Authorization", "Token YOUR_TOKEN_HERE");
+                conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+
+                DataOutputStream request = new DataOutputStream(conn.getOutputStream());
+
+                // 1) title 전송
+                request.writeBytes("--" + boundary + "\r\n");
+                request.writeBytes("Content-Disposition: form-data; name=\"title\"\r\n\r\n");
+                request.writeBytes("Test Image Title\r\n");
+
+                // 2) 이미지 전송
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, baos);
+                byte[] imageBytes = baos.toByteArray();
+
+                request.writeBytes("--" + boundary + "\r\n");
+                request.writeBytes("Content-Disposition: form-data; name=\"image\"; filename=\"sample.jpg\"\r\n");
+                request.writeBytes("Content-Type: image/jpeg\r\n\r\n");
+                request.write(imageBytes);
+                request.writeBytes("\r\n");
+                request.writeBytes("--" + boundary + "--\r\n");
+
+                request.flush();
+                request.close();
+
+                int responseCode = conn.getResponseCode();
+                return responseCode == HttpURLConnection.HTTP_CREATED || responseCode == HttpURLConnection.HTTP_OK;
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                return false;
+            }
+        }
+
+        @Override
+        protected void onPostExecute(Boolean success) {
+            if (success) {
+                Toast.makeText(getApplicationContext(), "Upload Success!", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(getApplicationContext(), "Upload Failed", Toast.LENGTH_SHORT).show();
             }
         }
     }
