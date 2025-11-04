@@ -15,92 +15,59 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int MY_PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE = 1;
-
-    ImageView imgView;
     TextView textView;
-    String site_url = "http://10.0.2.2:9000/api_root/Post";
-    JSONObject post_json;
-    String imageUrl = null;
-    Bitmap bmImg = null;
+    String socketHost = "10.0.2.2";  // Emulator → localhost
+    int socketPort = 9000;
 
     @Override
-    protected void onCreate(Bundle saveInstanceState) {
-        super.onCreate(saveInstanceState);
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
         setContentView(R.layout.activate_main);
 
-        textView = (TextView)findViewById(R.id.textView);
+        textView = findViewById(R.id.textView);
     }
 
     public void onClickDownload(View v) {
-        Toast.makeText(getApplicationContext(), "Downloading from socket server...", Toast.LENGTH_SHORT).show();
-        new CloudImage().execute(site_url);
+        Toast.makeText(this, "서버에서 이미지 목록 불러오는 중...", Toast.LENGTH_SHORT).show();
+        new CloudImage().execute();
     }
 
-    public void onClickUpload(View v) {
-        new PutPost().execute();
-    }
-
-    private class CloudImage extends AsyncTask<String, Integer, List<Bitmap>> {
+    private class CloudImage extends AsyncTask<Void, Void, List<Bitmap>> {
         @Override
-        protected List<Bitmap> doInBackground(String ...urls) {
+        protected List<Bitmap> doInBackground(Void... voids) {
             List<Bitmap> bitmapList = new ArrayList<>();
 
-            try {
-                String apiUrl = urls[0];
-                String token = "";
-                URL urlAPI = new URL(apiUrl);
-                HttpURLConnection conn = (HttpURLConnection) urlAPI.openConnection();
-                conn.setRequestProperty("Authorization", "Token" + token);
-                conn.setRequestMethod("GET");
-                conn.setConnectTimeout(3000);
-                conn.setReadTimeout(3000);
+            try (Socket socket = new Socket(socketHost, socketPort)) {
+                DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
+                DataInputStream dis = new DataInputStream(socket.getInputStream());
 
-                int responseCode = conn.getResponseCode();
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    InputStream is = conn.getInputStream();
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-                    StringBuilder result = new StringBuilder();
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        result.append(line);
-                    }
-                    is.close();
+                dos.writeUTF("GET_IMAGES");
+                dos.flush();
 
-                    String strJson = result.toString();
-                    JSONArray aryJson = new JSONArray(strJson);
+                String jsonStr = dis.readUTF();
+                JSONArray aryJson = new JSONArray(jsonStr);
 
-                    for (int i = 0; i < aryJson.length(); i++) {
-                        post_json = (JSONObject) aryJson.get(i);
-                        imageUrl = post_json.getString("image");
+                for (int i = 0; i < aryJson.length(); i++) {
+                    JSONObject obj = aryJson.getJSONObject(i);
+                    int imgSize = obj.getInt("size");
+                    byte[] imgBytes = new byte[imgSize];
 
-                        if (!imageUrl.equals("")) {
-                            URL myImageUrl = new URL(imageUrl);
-                            conn = (HttpURLConnection) myImageUrl.openConnection();
-                            InputStream imgStream = conn.getInputStream();
-
-                            Bitmap imageBitmap = BitmapFactory.decodeStream(imgStream);
-                            bitmapList.add(imageBitmap);
-                            imgStream.close();
-                        }
-                    }
+                    dis.readFully(imgBytes);
+                    Bitmap bitmap = BitmapFactory.decodeByteArray(imgBytes, 0, imgBytes.length);
+                    bitmapList.add(bitmap);
                 }
-            } catch (IOException | JSONException e) {
+
+            } catch (Exception e) {
                 e.printStackTrace();
             }
 
@@ -121,59 +88,40 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private class PutPost extends AsyncTask<Void, Void, Boolean> {
+    // =================== 이미지 업로드 =====================
+    public void onClickUpload(View v) {
+        new PutPost().execute();
+    }
 
+    private class PutPost extends AsyncTask<Void, Void, String> {
         @Override
-        protected Boolean doInBackground(Void... voids) {
-            try {
+        protected String doInBackground(Void... voids) {
+            try (Socket socket = new Socket(socketHost, socketPort)) {
+                DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
+                DataInputStream dis = new DataInputStream(socket.getInputStream());
+
                 Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.ic_launcher_background);
-
-                URL url = new URL(site_url);
-                String boundary = "*****" + Long.toString(System.currentTimeMillis()) + "*****";
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setDoOutput(true);
-                conn.setRequestProperty("Authorization", "Token YOUR_TOKEN_HERE");
-                conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
-
-                DataOutputStream request = new DataOutputStream(conn.getOutputStream());
-
-                // 1) title 전송
-                request.writeBytes("--" + boundary + "\r\n");
-                request.writeBytes("Content-Disposition: form-data; name=\"title\"\r\n\r\n");
-                request.writeBytes("Test Image Title\r\n");
-
-                // 2) 이미지 전송
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, baos);
-                byte[] imageBytes = baos.toByteArray();
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, baos);
+                byte[] imgBytes = baos.toByteArray();
 
-                request.writeBytes("--" + boundary + "\r\n");
-                request.writeBytes("Content-Disposition: form-data; name=\"image\"; filename=\"sample.jpg\"\r\n");
-                request.writeBytes("Content-Type: image/jpeg\r\n\r\n");
-                request.write(imageBytes);
-                request.writeBytes("\r\n");
-                request.writeBytes("--" + boundary + "--\r\n");
+                dos.writeUTF("UPLOAD_IMAGE sample.jpg");
+                dos.writeInt(imgBytes.length);
+                dos.write(imgBytes);
+                dos.flush();
 
-                request.flush();
-                request.close();
-
-                int responseCode = conn.getResponseCode();
-                return responseCode == HttpURLConnection.HTTP_CREATED || responseCode == HttpURLConnection.HTTP_OK;
+                String response = dis.readUTF();
+                return response;
 
             } catch (Exception e) {
                 e.printStackTrace();
-                return false;
+                return "Upload Failed: " + e.getMessage();
             }
         }
 
         @Override
-        protected void onPostExecute(Boolean success) {
-            if (success) {
-                Toast.makeText(getApplicationContext(), "Upload Success!", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(getApplicationContext(), "Upload Failed", Toast.LENGTH_SHORT).show();
-            }
+        protected void onPostExecute(String result) {
+            Toast.makeText(MainActivity.this, "서버 응답: " + result, Toast.LENGTH_SHORT).show();
         }
     }
 }

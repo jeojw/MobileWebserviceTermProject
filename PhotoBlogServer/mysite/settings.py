@@ -35,7 +35,7 @@ MIDDLEWARE = [
 
 CORS_ALLOW_ALL_ORIGINS = True
 
-ROOT_URLCONF = 'blog.urls'
+ROOT_URLCONF = 'mysite.urls'
 
 DATABASES = {
     'default': {

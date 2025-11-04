@@ -1,75 +1,66 @@
 import socket
-from datetime import datetime
-import os
-import re
+import requests
+import io
+import json
 
 HOST = "0.0.0.0"
 PORT = 9000
-REQUEST_DIR = "./request"
-os.makedirs(REQUEST_DIR, exist_ok=True)
+DJANGO_API_URL = "http://127.0.0.1:8000/"
+UPLOAD_API_URL = "http://127.0.0.1:8000/post/new/"
 
-def save_request(data):
-    timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    filename = f"{REQUEST_DIR}/{timestamp}.bin"
-    with open(filename, "wb") as f:
-        f.write(data)
-    print(f"[+] Saved request to {filename}")
-    return filename
+def handle_client(conn):
+    try:
+        dis = conn.makefile("rb")
+        dos = conn.makefile("wb")
 
-def validate_protocol(request_text):
-    lines = request_text.splitlines()
-    if not lines:
-        return "400 Bad Request (empty request)"
+        cmd = conn.recv(1024).decode().strip()
 
-    request_line = lines[0].strip()
-    pattern = r"^(GET|POST|PUT|DELETE|HEAD|OPTIONS) [^\s]+ HTTP/1\.[01]$"
-    if not re.match(pattern, request_line):
-        return f"400 Bad Request (invalid request line: {request_line})"
+        if cmd == "GET_IMAGES":
+            res = requests.get(DJANGO_API_URL)
+            posts = res.json()
 
-    headers = "\n".join(lines[1:])
-    required_headers = ["Host", "User-Agent", "Accept-Encoding"]
-    for header in required_headers:
-        if not re.search(rf"^{header}:", headers, re.MULTILINE | re.IGNORECASE):
-            return f"400 Missing required header: {header}"
+            json_list = []
+            for post in posts:
+                img_path = post.get("image", "")
+                print(img_path)
+                if img_path:
+                    img_res = requests.get(f"http://127.0.0.1:8000/{img_path}")
+                    img_bytes = img_res.content
+                    json_list.append({"size": len(img_bytes)})
+                    conn.sendall(json.dumps(json_list[-1]).encode() + b"\n")
+                    conn.sendall(img_bytes)
 
-    return "200 OK (Protocol Valid)"
+            conn.sendall(json.dumps(json_list).encode())
+
+        elif cmd.startswith("UPLOAD_IMAGE"):
+            filename = cmd.split(" ")[1]
+            img_size_data = conn.recv(4)
+            img_size = int.from_bytes(img_size_data, "big")
+            img_data = conn.recv(img_size)
+
+            files = {"image": (filename, io.BytesIO(img_data), "image/jpeg")}
+            data = {"title": "Socket Upload"}
+            res = requests.post(UPLOAD_API_URL, files=files, data=data)
+
+            conn.sendall(b"Upload OK" if res.status_code in [200, 201] else b"Upload Failed")
+
+        else:
+            conn.sendall(b"Unknown Command")
+
+    except Exception as e:
+        conn.sendall(f"Error: {e}".encode())
+    finally:
+        conn.close()
 
 def start_server():
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
-        server.bind((HOST, PORT))
-        server.listen(5)
-        print(f"[*] Socket Server running on {HOST}:{PORT}")
-
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((HOST, PORT))
+        s.listen(5)
+        print(f"Socket server running on {HOST}:{PORT}")
         while True:
-            conn, addr = server.accept()
-            print(f"[+] Connection from {addr}")
-
-            data = b""
-            conn.settimeout(2.0)
-            try:
-                while True:
-                    chunk = conn.recv(4096)
-                    if not chunk:
-                        break
-                    data += chunk
-            except socket.timeout:
-                pass
-
-            if not data:
-                conn.close()
-                continue
-
-            save_request(data)
-
-            request_text = data.decode(errors="ignore")
-            result = validate_protocol(request_text)
-            print(f"[Protocol Check] {result}")
-
-            status_code = result.split(" ")[0]
-            reason = "OK" if status_code == "200" else "Bad Request"
-            response = f"HTTP/1.1 {status_code} {reason}\r\nContent-Length: 0\r\n\r\n"
-            conn.sendall(response.encode())
-            conn.close()
+            conn, addr = s.accept()
+            print(f"Connected by {addr}")
+            handle_client(conn)
 
 if __name__ == "__main__":
     start_server()
