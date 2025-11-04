@@ -26,7 +26,7 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
     TextView textView;
-    String socketHost = "10.0.2.2";  // Emulator → localhost
+    String socketHost = "10.0.2.2";
     int socketPort = 9000;
 
     @Override
@@ -51,7 +51,7 @@ public class MainActivity extends AppCompatActivity {
                 DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
                 DataInputStream dis = new DataInputStream(socket.getInputStream());
 
-                dos.writeUTF("GET_IMAGES");
+                dos.write("GET_IMAGES\n".getBytes());
                 dos.flush();
 
                 String jsonStr = dis.readUTF();

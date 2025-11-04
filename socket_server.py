@@ -2,10 +2,11 @@ import socket
 import requests
 import io
 import json
+import struct
 
 HOST = "0.0.0.0"
 PORT = 9000
-DJANGO_API_URL = "http://127.0.0.1:8000/"
+DJANGO_API_URL = "http://127.0.0.1:8000/api_root/post"
 UPLOAD_API_URL = "http://127.0.0.1:8000/post/new/"
 
 def handle_client(conn):
@@ -16,19 +17,34 @@ def handle_client(conn):
         cmd = conn.recv(1024).decode().strip()
 
         if cmd == "GET_IMAGES":
+            print("성공")
             res = requests.get(DJANGO_API_URL)
+            print(res)
             posts = res.json()
 
             json_list = []
+            image_data_list = []
             for post in posts:
                 img_path = post.get("image", "")
-                print(img_path)
                 if img_path:
-                    img_res = requests.get(f"http://127.0.0.1:8000/{img_path}")
+                    if not img_path.startswith("http"):
+                        img_path = f"http://127.0.0.1:8000/{img_path.lstrip('/')}"
+                    img_res = requests.get(img_path)
                     img_bytes = img_res.content
                     json_list.append({"size": len(img_bytes)})
-                    conn.sendall(json.dumps(json_list[-1]).encode() + b"\n")
-                    conn.sendall(img_bytes)
+                    image_data_list.append(img_bytes)
+
+            json_str = json.dumps(json_list)
+            json_bytes = json_str.encode("utf-8")
+            conn.send(struct.pack(">H", len(json_bytes)))
+            conn.send(json_bytes)
+
+            for img_bytes in image_data_list:
+                conn.sendall(img_bytes)
+
+            print("[+] Sent all images successfully")
+
+            print("[+] Sent all images successfully")
 
             conn.sendall(json.dumps(json_list).encode())
 
@@ -48,7 +64,11 @@ def handle_client(conn):
             conn.sendall(b"Unknown Command")
 
     except Exception as e:
-        conn.sendall(f"Error: {e}".encode())
+        print(f"[!] Server internal error: {e}")
+        try:
+            conn.sendall(f"Error: {e}".encode())
+        except OSError:
+            pass
     finally:
         conn.close()
 
